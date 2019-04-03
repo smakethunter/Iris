@@ -1,0 +1,28 @@
+---
+title: "Iris Flower Data Clean-up"
+author: "Sean F. Larsen"
+date: "April 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+```
+
+## Ronald Fisher's Iris Flower Dataset
+
+The Iris Flower dataset was introduced by the British statistician and biologist Ronald Fisher in his 1936 paper The use of multiple measurements in taxonomic problems as an example of linear discriminant analysis.
+
+This dataset is popular among data scientists and is used in many introductory R training programs on data clean-up and data visualization.  This is my attempt at using my skills with this dataset.
+
+## The Dataset
+
+I aquired the dataset online in a CSV format. This code reads, saves, and set-up the data as a dataframe.
+
+```{r cars}
+iris <- read.csv(file="iris.csv")
+iris_df <- data.frame(iris)
+iris_df
+```
