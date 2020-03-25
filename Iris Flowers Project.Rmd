@@ -10,34 +10,176 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(caret)
 ```
 
 ## Ronald Fisher's Iris Flower Dataset
+![](https://cdn-images-1.medium.com/max/1600/1*7bnLKsChXq94QjtAiRn40w.png)
 
 The Iris Flower dataset was introduced by the British statistician and biologist Ronald Fisher in his 1936 paper The use of multiple measurements in taxonomic problems as an example of linear discriminant analysis.
 
+![**RONALD FISHER 1913**](https://upload.wikimedia.org/wikipedia/commons/a/aa/Youngronaldfisher2.JPG)
 
-This dataset is popular among begining data scientists and is used in many introductory R training programs on data clean-up and data visualization.
+
+The Iris data is a favorite example when writing about R accessors , Data Exporting, Data importing, and for different visualization techniques. It is often used for examples in machine learning.
 
 ## The Dataset
 
-I aquired the dataset online in a CSV format. This code reads, saves, and set-up the data as iris.tidy.
+Th Iris data set gives the measurements in centimeters of the variables sepal length and width and petal length and width, respectively, for 50 flowers from each of 3 species of iris. The species are Iris setosa, versicolor, and virginica. The data set has 150 cases (rows) and 5 variables (columns) named Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, and Species.
+
+I aquired the dataset online in a CSV format. Using the gather fuction tydyr, I will clean up the data and create a dataframe iris_df. The new data frame will have 600 rows and four columns.
 
 ```{r include=FALSE}
+# Read the file and create an iris data set in R.
 iris <- read.csv(file="iris.csv")
+
+# Using tydyr to gather and separet the values.
+iris_tidy <- iris %>% gather(key, Value, -Species) %>% separate(key, c("Part", "Measure"), "\\.")
+
+# Creating a datafram
+iris_df <- data.frame(iris_tidy)
+
 ```
 
-Testing the gather and separate functions.
+Here is a Scatter Plot of the Sepal and Pedal features of the three Species.
 
-```{r include=TRUE}
-iris.tidy <- iris %>% gather(key, Value, -Species) %>% separate(key, c("Part", "Measure"), "\\.")
-head(iris.tidy)
-```
-
-Drawing a Scatter Plot of the Sepal and Pedal features of the three Species.
-
-```{r}
-ggplot(iris.tidy, aes(x = Measure, y = Value, col = Part)) +
+```{r echo=FALSE}
+# Plot the dataframe
+ggplot(iris_df, aes(x = Measure, y = Value, col = Part)) +
   geom_jitter() +
   facet_grid(. ~ Species)
 ```
+
+## The Decision Tree and Machine Learning
+
+The Iris data set is perfect data set for demonstrating the decsion tree machine learning algorithm. A decision tree is a tool that uses a tree like model set of decisions that lead the user to the answer. Decision trees are commonly used in operations research, specifically in decision analysis, to help identify a strategy most likely to reach a goal.
+
+The benefits of the descision tree is that they are easy to understand an interpret, thye work with categorical and numerical data, they require little data processing, and feature selection is automatic. They are not susceptible to outliers and are able to capture nonlinear relationships. The downside of descision trees is they are prone to over fitting and with large complex data sets can be inaccurate.
+
+## Training Test Split
+
+Here we are taking the iris_df data frame and spliting it into two new file, iris_training to train the model and iris_test to test the model.  The training data will contain 80% of the original data and the test model will contain 20%. This model will be used to determine which species of iris a flower is, so the test data will not contain the species column. This model uses the information index in the split criterion and the Complexity Parameter to measure to control tree growth. CP is first set to zero.
+
+Once the data is trained and tested the model, the decision tree will be plotted and then evaluated with a confusion matrix to display the results.
+
+```{r echo=FALSE}
+# The Split
+n <- nrow(iris_df)
+n_train <- round(.80 * n)
+
+#set the Seed
+set.seed(123)
+
+# Create a vector of indicise which is an 80% random sample
+train_indicise <- sample(1:n, n_train)
+
+# subset the data frame into the training set
+iris_train <- iris_df[train_indicise, ]
+
+# Exclude the training indicise to create the test set
+iris_test <- iris_df[-train_indicise, ]
+
+# Train the model to predict "Species"
+iris_model <- rpart(formula = Species ~.,
+                    data = iris_train,
+                    method = "class",
+                    control = rpart.control(cp = 0),
+                    parms = list(split = "information"))
+
+# The Prediction
+iris_pred <- predict(object = iris_model,
+                     newdata = iris_test,
+                     type = "class")
+
+# Plotting the tree
+prp(iris_model, extra = 1, faclen=0,  nn = T,
+    box.col=c("green", "red"))
+
+# The Confusion Matrix
+confusionMatrix(data = iris_pred,
+                reference = iris_test$Species)
+```
+## First Run of the Model
+If you look at the scatter plot, you see that the Iris Species versicolor and virginica are very similar.  At first pass, this model is 75% accurate. For the setosa speicies it was the most accurate.
+
+To better evalue this model, the next steop would be to look at CP.  The xerror, is the optimal value for CP. The model accuracy is calculated and stored in variable base_accuracy.
+
+```{r echo=FALSE}
+
+printcp(iris_model)
+plotcp(iris_model)
+
+base_accuracy <- mean(iris_pred == iris_model$Species)
+
+```
+
+## Pruning the Tree
+One problem to avoid is over fitting the model and this is done with pruning.  There are two types of pruning. Pre-pruning and Post-pruning.
+Pre-pruning is a stopr criteria built into rpart. I am setting the CP to 0, the mex depth to 8 and the min spilt to 50.
+
+```{r echo=FALSE}
+# Grow a tree with minsplit of 100 and max depth of 8
+iris_model_preprun <- rpart(formula = Species ~.,
+                    data = iris_train,
+                    method = "class",
+                    control = rpart.control(cp = 0),
+                    maxdepth = 8,
+                    minsplit = 50)
+
+# Compute the accuracy of the pruned tree
+iris_pred_preprun <- predict(object = iris_model_preprun,
+                     newdata = iris_test,
+                     type = "class")
+# Test the accruacy
+accuracy_preprun <- mean(iris_pred_preprun == iris_model_preprun$Species)
+
+# Plotting the tree
+prp(iris_model_preprun, extra = 1, faclen=0,  nn = T,
+    box.col=c("green", "red"))
+
+# The Confusion Matrix
+confusionMatrix(data = iris_pred_preprun,
+                reference = iris_test$Species)
+printcp(iris_model_preprun)
+plotcp(iris_model_preprun)
+
+```
+
+With the Pre-Pruning results, we can see that the overall accuracy didn't improve. For the most part each speicies results remained the same.
+
+## Post-Pruning
+
+With post-pruning, you allow the tree to grow to its full extend and only adjust the CP.  We will set that to 0.039
+
+```{r echo=FALSE}
+
+# Grow a tree with minsplit of 100 and max depth of 8
+iris_model_postprun <- rpart(formula = Species ~.,
+                    data = iris_train,
+                    method = "class",
+                    control = rpart.control(cp = 0.039),
+                    maxdepth = 9,
+                    minsplit = 50)
+
+# Compute the accuracy of the pruned tree
+iris_pred_postprun <- predict(object = iris_model_postprun,
+                     newdata = iris_test,
+                     type = "class")
+# Test the accruacy
+accuracy_postprun <- mean(iris_pred_preprun == iris_model_postprun$Species)
+
+# Plotting the tree
+prp(iris_model_postprun, extra = 1, faclen=0,  nn = T,
+    box.col=c("green", "red"))
+
+# The Confusion Matrix
+confusionMatrix(data = iris_pred_postprun,
+                reference = iris_test$Species)
+printcp(iris_model_postprun)
+plotcp(iris_model_postprun)
+```
+
+# Conculsion
+The accruacy of a model is improved when the tree is pruned.  Depending on the model both pre-pruning and post-pruning may be needed to prevent over fitting, under, fitting, and fine tune the model for accuracy.
